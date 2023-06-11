@@ -5,92 +5,286 @@ system("clear");
 
 $show = 'show tables;';
 $user_prompt = "";
+$bool = true;
+$dbname = "";
+$bool_comma = false;
+$user_prompt_children = "";
 
 do {
-    $user_prompt = readline("mysql>");
-    $comma = substr($user_prompt, strlen($user_prompt) - 1, strlen($user_prompt));
+    $bool = true;
+    $user_prompt = readline("mysql> ");
+    $comma = substr(trim($user_prompt), strlen($user_prompt) - 1, strlen($user_prompt));
 
-    if ($comma != ";") {
+    if ($comma != ";" && $user_prompt != "") {
         do {
-            $user_prompt_children = readline("     >");
+            $user_prompt_children = readline("     > ");
             $comma = substr($user_prompt_children, strlen($user_prompt_children) - 1, strlen($user_prompt_children));
+            $bool = true;
         } while ($comma != ";");
     }
 
     $comma = " ";
 
-    switch ($user_prompt) {
-        case $show:
-            $data = showTables();
-            generateTable($data);
-            break;
-        case strtoupper($show):
-            $data = showTables();
-            generateTable($data);
-            break;
-        case 'show tables;':
-            $data = showTables();
-            generateTable($data);
-            break;
-        case 'SHOW tables;':
-            $data = showTables();
-            generateTable($data);
-            break;
-        default:
-            // helpShowTables();
-            break;
+    if ($bool == true && trim($user_prompt_children) == ";") {
+        $user_prompt .= ";";
     }
 
     $separate_array = explode(" ", $user_prompt);
-    if (($separate_array[0] == "describe" || $separate_array[0] == "DESCRIBE") || ($separate_array[0] == "desc" || $separate_array[0] == "DESC")) {
 
-        $length_word = array();
-        echo trim(str_replace(";", "", trim($separate_array[1])));
+    if ($separate_array[0] == "use") {
+        $dbname = trim(str_replace(";", "", $separate_array[1]));
+        $data = multipleQuery(trim(str_replace(";", "", $user_prompt)),$dbname);
+        if (is_array($data)) {
+            echo "using $dbname...\n";
+        }else{
+            echo $data."\n";
+            $dbname="";
+        }
+    }else {
+        
+    
 
-        $return = describe(trim(str_replace(";", "", trim($separate_array[1]))));
-        if (is_array($return)) {
-            print_r($return);
-            $length_word = generateLongTable($return);
-            print_r($length_word);
+    $user_prompt = trim($user_prompt);
+    
+    // echo $user_prompt;
+    // echo "___".str_replace(" ","",$user_prompt)."___";
+
+    $check = str_replace(" ", "", $user_prompt);
+    if ($user_prompt != "clear;") {
+        if ($user_prompt != "exit;" && $check != ";") {
+            if (!empty($user_prompt) || $user_prompt == ";" || $user_prompt == " ") {
+                $data = multipleQuery(trim(str_replace(";", "", $user_prompt)),$dbname);
+                if (is_array($data)) {
+                    generateLongTable($data);
+                } else {
+                    echo $data . "\n";
+                }
+            }
+        }
+    }else{
+        system("clear");
+    }
+
+}
+} while (trim($user_prompt) != "exit;");
+
+function multipleQuery($query,$dbname="cinema")
+{
+
+    $array = [];
+    $query_verified = html_entity_decode($query);
+    try {
+        $db = connectToDatabase($dbname);
+        $statement = $db->prepare($query_verified);
+        $statement->execute();
+        $array = $statement->fetchAll();
+    } catch (\PDOException $e) {
+        return "Erreur : " . $e->getMessage();
+    }
+    return $array;
+}
+function generateLongTable($array)
+{
+    $length_column_arr = lengthColumn($array);
+    $head_lines = generateHead($length_column_arr, $array);
+
+    $body_lines = generateBody($head_lines[1], $array);
+    // print_r($array);
+    // print_r($length_column_arr);
+    // print_r($array);
+    // $separator = createSeparator($head_lines[1], $array);
+    echo $head_lines[2];
+    echo $head_lines[0];
+    echo $head_lines[2];
+    echo $body_lines;
+    echo $head_lines[2];
+}
+
+function generateBody($length_column_arr, $array)
+{
+    $i = 0;
+    $j = 0;
+    $line = "";
+    foreach ($array as $key => &$value) {
+        $line .= "|";
+        foreach ($value as $key2 => &$val) {
+            if (is_int($key2)) {
+                if (strlen($val) >= $length_column_arr[$i]) {
+                    // $length_column_arr[$i] = strlen($val);
+                    // echo "sup";
+                    $line .= " " . $val . generateSpace($length_column_arr[$i], strlen($val)) . " ";
+                } else {
+                    // echo "min";
+                    // if ($val=="") {
+                    //     $line .= " ".generateSpace($length_column_arr[$i]) ." ";
+                    // }else{
+
+                    $line .= " " . $val . generateSpace($length_column_arr[$i], strlen($val)) . " ";
+                    // }
+                }
+                // echo $length_column_arr[$i];
+                // echo "\n";
+                $i++;
+                $line .= "|";
+            }
+        }
+        $i = 0;
+        $j++;
+        $line .= "\n";
+    }
+
+
+
+    return $line;
+}
+
+function margeMiddle($length_of_line, $len_of_word)
+{
+    $len = $length_of_line - $len_of_word - 2;
+    $line = "";
+    for ($i = 0; $i < $len; $i++) {
+        $line .= " ";
+    }
+    // echo "__($line)____";
+    return $line;
+}
+
+function generateSpace($length_of_line, $len_of_word)
+{
+    $len = $length_of_line - $len_of_word;
+    $line = "";
+    for ($i = 0; $i < $len; $i++) {
+        $line .= " ";
+    }
+    // echo "__($line)____";
+    return $line;
+}
+
+function generateHead($length_column_arr, $array)
+{
+    $i = 0;
+    $line = "|";
+    foreach ($array as $key => &$value) {
+        # code...
+
+        foreach ($value as $key2 => &$val) {
+            if (is_string($key2) && $key == 0) {
+                if (strlen($key2) >= $length_column_arr[$i]) {
+                    $length_column_arr[$i] = strlen($key2);
+                    $line .= " " . $key2 . generateSpace($length_column_arr[$i], strlen($key2)) . " ";
+                } else {
+                    $line .= " " . $key2 . generateSpace($length_column_arr[$i], strlen($key2)) . " ";
+                }
+                // echo $length_column_arr[$i];
+                // echo "\n";
+                $i++;
+                $line .= "|";
+            }
+
         }
     }
 
-    if (($separate_array[0] == "select" && $separate_array[2] == "from") || ($separate_array[0] == "SELECT" && $separate_array[2] == "FROM")) {
-        $data = selectFrom(trim($separate_array[1]), trim(str_replace(";", "", $separate_array[3])));
-        generateTable($data);
-    }
-} while ($user_prompt != "exit;");
+    // print_r($array);
+    $line .= "\n";
+    $arrayLine_Length = [];
+    $arrayLine_Length[0] = $line;
+    $arrayLine_Length[1] = $length_column_arr;
 
+    $new_separator = createSeparator($length_column_arr, $array);
+    $arrayLine_Length[2] = $new_separator;
 
-function generateLongTable($array)
-{
-    return lengthColumn($array);
+    return $arrayLine_Length;
 }
+
+function createSeparator($length_column_arr, $array)
+{
+    $i = 0;
+    $line = "+";
+    foreach ($array as $key => &$value) {
+        # code...
+
+        foreach ($value as $key2 => &$val) {
+            if (is_string($key2) && $key == 0) {
+                for ($j = 0; $j < $length_column_arr[$i]; $j++) {
+                    $line .= "-";
+                }
+                $i++;
+                $line .= "--+";
+            }
+
+        }
+    }
+
+    // print_r($array);
+
+    $line .= "\n";
+    return $line;
+}
+
 
 function lengthColumn($array)
 {
     $i = 0;
     $width = 0;
     $new_array = [];
+    $j = 1;
     foreach ($array as $key => $value) {
-        foreach ($array[$key] as $key2 => $val) {
-            if (is_int($key2)) {
-                if ($key2 + 1 == $i) {
-                    if ($width < strlen($key2)) {
-                        $width = strlen($key2);
-                    }
+        foreach ($value as $key2 => $val) {
+            // echo "KEY : $key\n";
+            // echo $key2."\n";
+            // echo $val."\n";
+            if ($key == 0) {
+                # code...
+                $new_array[$i] = $width;
+            }
 
-                    if ($width < strlen($val)) {
-                        $width = strlen($val);
-                    }
-                    $new_array[$i] = $width;
+            if (is_string($key2)) {
+                // if ($key2 + 1 == $i) {
+                if (strlen($new_array[$i]) < strlen($key2)) {
+                    $width = strlen($key2);
+                    // echo "$i : $width [key2 $key2][val $val];\n";
+                    $new_array[$i] = $val;
                 }
-            } else {
+
+                if (strlen($new_array[$i]) < strlen($val)) {
+                    $width = strlen($val);
+                    // echo "$i : $width [key2 $key2][val $val];\n";
+                    $new_array[$i] = $val;
+                    // echo $val."\n";
+                }
+
+                //}
+            }
+
+            if (is_int($key2)) {
+                if (strlen($new_array[$i]) < strlen($val)) {
+                    $width = strlen($val);
+                    // echo "$i : $width [key2 $key2][val $val];\n";
+                    $new_array[$i] = $val;
+                }
+
+
                 $i++;
             }
+
+            $j++;
+
+
+
+            if (is_int($key2)) {
+                $width = 0;
+            }
         }
+
+        $j = 0;
         $i = 0;
+        // print_r($value);
     }
+
+    foreach ($new_array as $key => &$value) {
+        $value = strlen($value);
+    }
+    //print_r($new_array);
     return $new_array;
 }
 
@@ -203,9 +397,9 @@ function helpShowTables()
     echo "help> syntax -> show tables;\n";
 }
 
-function connectToDatabase()
+function connectToDatabase($dbname="cinema")
 {
-    return new \PDO("mysql:dbname=cinema;host=localhost", "damien", "PETITnuage-26");
+    return new \PDO("mysql:dbname=$dbname;host=localhost", "damien", "PETITnuage-26");
 }
 
 
@@ -228,22 +422,6 @@ function margeRight()
 {
     return " |\n";
 }
-
-function margeMiddle($length_of_line, $len_of_word)
-{
-    $len = $length_of_line - $len_of_word - 2;
-    $line = "";
-    for ($i = 0; $i < $len; $i++) {
-        $line .= " ";
-    }
-
-    return $line;
-}
-
-
-
-
-
 
 // UNUSED
 // function heightTable($array)
